@@ -1,0 +1,180 @@
+name: Deploy Infrastructure & Lambda
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/**"
+      - "terraform/**"
+      - "server/**"
+      - "ca/ca.crt"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/**"
+      - "terraform/**"
+      - "server/**"
+      - "ca/ca.crt"
+
+env:
+  AWS_REGION: eu-west-2
+  TF_VERSION: "1.9.0"
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        env:
+          TF_BACKEND_BUCKET: ${{ secrets.AWS_ACCOUNT_ID }}-jyjulianwong-obsidian-terraform-state
+          TF_BACKEND_TABLE:  jyjulianwong-obsidian-terraform-lock
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_BACKEND_BUCKET" \
+            -backend-config="dynamodb_table=$TF_BACKEND_TABLE"
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          terraform plan \
+            -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" \
+            -var="domain_name=${{ secrets.OBSIDIAN_DOMAIN_NAME }}" \
+            -var="allowed_origins=${{ secrets.OBSIDIAN_ALLOWED_ORIGINS }}" \
+            -no-color \
+            -out=tfplan
+
+      - name: Post plan to PR
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const planOutput = '${{ steps.terraform-plan.outputs.stdout }}'.slice(0, 60000);
+            const body = `### Terraform Plan\n\`\`\`\n${planOutput}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  version_bump:
+    name: Calendar Version Bump
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag:     ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bump calver and tag
+        id: bump
+        run: python3 scripts/bump_calver.py
+
+      - name: Push commit and tag
+        run: git push origin HEAD:main --tags
+
+  deploy:
+    name: Terraform Apply + Lambda Deploy
+    needs: [version_bump]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version_bump.outputs.tag }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform
+        env:
+          TF_BACKEND_BUCKET: ${{ secrets.AWS_ACCOUNT_ID }}-jyjulianwong-obsidian-terraform-state
+          TF_BACKEND_TABLE:  jyjulianwong-obsidian-terraform-lock
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_BACKEND_BUCKET" \
+            -backend-config="dynamodb_table=$TF_BACKEND_TABLE"
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply \
+            -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" \
+            -var="domain_name=${{ secrets.OBSIDIAN_DOMAIN_NAME }}" \
+            -var="allowed_origins=${{ secrets.OBSIDIAN_ALLOWED_ORIGINS }}" \
+            -auto-approve \
+            -no-color
+
+      - name: Read Terraform outputs
+        id: tf_outputs
+        working-directory: terraform
+        run: |
+          echo "lambda_name=$(terraform output -raw lambda_function_name)" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # Build & deploy the real Lambda package (with dependencies)
+      # -----------------------------------------------------------------------
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Package Lambda
+        run: ./scripts/package_lambda.sh
+
+      - name: Update Lambda function code
+        env:
+          LAMBDA_NAME: ${{ steps.tf_outputs.outputs.lambda_name }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_NAME" \
+            --zip-file fileb://server/build/lambda.zip \
+            --region "$AWS_REGION"

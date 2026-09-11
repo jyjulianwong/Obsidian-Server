@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.uv/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Certificates and keys — never commit these
+*.key
+*.csr
+*.pem
+*.srl
+devices/
+
+# ca.crt is the CA's PUBLIC certificate — Terraform and CI need it committed
+# to upload as the mTLS truststore. Only ca.key (filtered above) is secret.
+!ca/ca.crt
+
+# Lambda build artifacts
+server/build/
+server/*.zip
+terraform/.placeholder-lambda.zip
+
+# Misc
+.DS_Store

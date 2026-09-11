@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.6.9
+    hooks:
+      - id: uv-lock
+        files: ^server/(pyproject\.toml|uv\.lock)$
+        args: [--project, server]
+
+  - repo: https://github.com/ninoseki/uv-sort
+    rev: v0.6.0
+    hooks:
+      - id: uv-sort
+        files: ^server/pyproject\.toml$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.1
+    hooks:
+      # Run the linter.
+      - id: ruff
+        args: [--fix, --config, server/pyproject.toml]
+      # Run the formatter.
+      - id: ruff-format
+        args: [--config, server/pyproject.toml]
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.86.0
+    hooks:
+      - id: terraform_fmt
+        args:
+          - --args=-recursive
