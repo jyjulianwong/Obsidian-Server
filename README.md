@@ -151,6 +151,7 @@ This creates the truststore bucket, the JWT signing key (in SSM), the devices ta
 
 ```bash
 terraform output apigatewayv2_domain_target
+terraform output apigatewayv2_jwks_domain_target
 ```
 
 ### 7. Point Cloudflare at API Gateway — human action
