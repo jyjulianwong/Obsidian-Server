@@ -51,6 +51,7 @@ Your other projects verify the JWT locally via Obsidian's JWKS endpoint
 │   ├── generate_ca.sh          # One-time: create the device CA
 │   ├── provision_device.py     # Issue + register a new device certificate
 │   ├── revoke_device.py        # Mark a device inactive
+│   ├── generate_mtls_bundle.sh # Bundle a device's key+cert into a .p12 for OS/browser import
 │   ├── package_lambda.sh       # Build the real (dependency-inclusive) Lambda zip
 │   └── run_local_server.sh     # Run the FastAPI app locally
 ├── examples/            # Copy-paste snippets for your OTHER projects
@@ -94,7 +95,7 @@ terraform apply -var="aws_account_id=$ACCOUNT_ID"
 cd ../..
 ```
 
-### 3. Generate the device CA — human action, local machine only
+### 3. Generate the device CA (on local machine only)
 
 ```bash
 ./scripts/generate_ca.sh
@@ -102,7 +103,7 @@ cd ../..
 
 This creates `ca/ca.key` (sensitive — never commit it, back it up offline) and `ca/ca.crt` (public — this one **is** committed, Terraform uploads it as the mTLS truststore).
 
-### 4. Phase 1 — create the ACM certificate only
+### 4. Terraform: Phase 1 — create the ACM certificate only
 
 The custom domain needs a validated ACM certificate before it can exist, and DNS validation for a Cloudflare-hosted domain can't be automated by Terraform (Cloudflare isn't the AWS-integrated DNS provider). So this is done in two phases.
 
@@ -120,7 +121,7 @@ terraform apply \
 terraform output acm_certificate_validation_records
 ```
 
-### 5. Add the ACM validation record to Cloudflare — human action
+### 5. Add the ACM validation record to Cloudflare
 
 In the Cloudflare dashboard for your domain → **DNS**, add the CNAME record printed above:
 
@@ -130,7 +131,7 @@ In the Cloudflare dashboard for your domain → **DNS**, add the CNAME record pr
 
 Wait a few minutes for DNS propagation and ACM validation (usually well under 10 minutes).
 
-### 6. Phase 2 — full apply
+### 6. Terraform: Phase 2 — apply the entire plan
 
 ```bash
 terraform apply \
@@ -155,7 +156,7 @@ In Cloudflare **DNS**, add another record:
 
 **Important:** this must stay grey-cloud (DNS only). A proxied (orange-cloud) record terminates TLS at Cloudflare's edge, which breaks client-certificate verification — the client cert would never reach API Gateway.
 
-### 8. Deploy the real Lambda code — first time only, manually
+### 8. Deploy the real Lambda code (manually for the first time only)
 
 Terraform's own zip has no dependencies bundled (just enough to create the function). Build and push the real one once, before CI/CD exists to do it for you:
 
@@ -167,10 +168,11 @@ aws lambda update-function-code \
   --zip-file fileb://server/build/lambda.zip
 ```
 
-### 9. Provision your first device — human action
+### 9. Provision your first device
 
 ```bash
-./scripts/provision_device.py my-laptop \
+DEVICE_ID="obsidian-my-laptop"
+./scripts/provision_device.py $DEVICE_ID \
   --table-name "$(terraform -chdir=terraform output -raw devices_table_name)"
 ```
 
@@ -183,31 +185,41 @@ This writes `devices/my-laptop/my-laptop.key` + `.crt` and registers `my-laptop`
 Bundle the key + cert (+ CA, so the OS can build the chain) into a `.p12` first:
 
 ```bash
-openssl pkcs12 -export -legacy \
-  -in devices/my-laptop/my-laptop.crt \
-  -inkey devices/my-laptop/my-laptop.key \
-  -certfile ca/ca.crt \
-  -out devices/my-laptop/my-laptop.p12 \
-  -name "Obsidian: my-laptop"
+DEVICE_ID="obsidian-my-laptop"
+./scripts/generate_mtls_bundle.sh $DEVICE_ID
 ```
 
-`-legacy` matters if your `openssl` is OpenSSL 3.x (`openssl version` — Homebrew's is), which defaults to AES-256/SHA-256 for `.p12` files. macOS Keychain's importer can't parse that and fails with **"OSStatus -26276"**; `-legacy` falls back to 3DES/RC2, which it understands. If your `openssl` doesn't recognize `-legacy` (older LibreSSL, e.g. macOS's built-in `/usr/bin/openssl`), you likely don't need it — that error is specific to modern OpenSSL 3.x defaults.
+This prompts twice for an export password (type the same thing both times) and writes `devices/my-laptop/my-laptop.p12`. It always passes `-legacy` to `openssl pkcs12`: OpenSSL 3.x (`openssl version` — Homebrew's is) defaults to AES-256/SHA-256 for `.p12` files, which macOS Keychain's importer can't parse — it fails with **"OSStatus -26276"** regardless of whether the password is right. `-legacy` falls back to 3DES/RC2, which Keychain understands.
 
-- **macOS:** double-click the `.p12` in Finder — Keychain Access imports it and prompts for the export password you just set.
+Before importing anywhere, verify the password actually took (the script prints this command with a placeholder — fill in the real password):
+
+```bash
+openssl pkcs12 -legacy -in devices/$DEVICE_ID/$DEVICE_ID.p12 -noout -passin pass:YOUR_PASSWORD
+```
+
+No output is success. A "Mac verify error" here means the two prompts in step 1 didn't match — rerun the script.
+
+- **macOS:** Double-click the `.p12` in Finder — Keychain Access imports it and prompts for the export password you just set. Or, run:
   ```bash
-  security import devices/my-laptop/my-laptop.p12 -k ~/Library/Keychains/login.keychain-db -P 'PASTE_YOUR_ACTUAL_PASSWORD_HERE' -T /usr/bin/security
+  security import devices/$DEVICE_ID/$DEVICE_ID.p12 -k ~/Library/Keychains/login.keychain-db -P 'YOUR_PASSWORD' -T /usr/bin/security
   ```
-- **Windows:** double-click the `.p12` → Certificate Import Wizard → store it under "Personal".
+  To remove it later (e.g. after revoking the device), delete the identity — the cert + private key `security import` created — from Keychain:
+  ```bash
+  security delete-identity -c "$DEVICE_ID" -t ~/Library/Keychains/login.keychain-db
+  ```
+  `-c` matches on the certificate's own Subject Common Name (`CN=<device_id>`, the identity `provision_device.py` issued) — not the `"Obsidian: <device_id>"` friendly name `generate_mtls_bundle.sh` sets on the `.p12`. Keychain only surfaces that friendly name for the private-key row; the certificate row (and everything `security` searches by `-c`) always uses the embedded CN. If the name isn't unique (e.g. the same device was provisioned twice), this refuses and asks for a SHA-256 hash instead — get one with `security find-certificate -c "$DEVICE_ID" -Z ~/Library/Keychains/login.keychain-db`, then pass it as `-Z <hash>` instead of `-c`. This only removes the certificate from Keychain — it doesn't revoke the device itself; see [Revocation](#revocation) for that.
+- **Windows:** Double-click the `.p12` → Certificate Import Wizard → Store it under "Personal".
 - **iOS / Android:** AirDrop or email the `.p12` to the device, then open it — Settings → General → VPN & Device Management will offer to install it (enter the export password).
-- **Linux (NSS-based browsers, e.g. Chrome):** `chrome://settings/certificates` → **Your certificates** → **Import** → select the `.p12`.
+- **Linux (NSS-based browsers, e.g. Chrome):** `chrome://settings/certificates` → **Your certificates** → **Import** → Select the `.p12`.
 
 Optional, for a fully silent flow on a device you manage: some browsers support pre-selecting the client certificate for a given origin via enterprise policy (e.g. Chrome's `AutoSelectCertificateForUrls`), so the OS-level cert picker never appears. The exact mechanism is OS/browser-version specific — search for that policy name plus your OS if you want it; it's a convenience, not a requirement (a picker you dismiss once per browser profile is otherwise the norm).
 
 ### 10. Test it
 
 ```bash
-curl --cert devices/my-laptop/my-laptop.crt \
-     --key devices/my-laptop/my-laptop.key \
+DEVICE_ID="obsidian-my-laptop"
+curl --cert devices/$DEVICE_ID/$DEVICE_ID.crt \
+     --key devices/$DEVICE_ID/$DEVICE_ID.key \
      -X POST https://auth.jyjwong.com/auth/token
 ```
 
@@ -259,7 +271,13 @@ Copy `examples/python_client_get_token.py`, point `DEVICE_CERT` at a provisioned
 
 ## Revocation
 
-- **Preferred, instant:** `./scripts/revoke_device.py my-laptop --table-name <devices_table_name>`. `/auth/token` refuses the device on its very next request; already-issued tokens still expire naturally within `token_ttl_seconds` (default 1 hour).
+- **Preferred, instant:**
+  ```bash
+  DEVICE_ID="obsidian-my-laptop"
+  ./scripts/revoke_device.py $DEVICE_ID \
+    --table-name "$(terraform -chdir=terraform output -raw devices_table_name)"
+  ```
+  `/auth/token` refuses the device on its very next request; already-issued tokens still expire naturally within `token_ttl_seconds` (default 1 hour).
 - **Certificate expiry:** device certs are short-lived (90 days by default — see `scripts/provision_device.py --days`), so a device you forget to revoke stops working on its own.
 - **Rotating the CA itself** (only if the CA key is compromised — not needed for revoking one device): regenerate `ca/ca.crt`, `terraform apply` to re-upload it and bump `truststore_version`, then re-issue every device's certificate against the new CA.
 
@@ -333,7 +351,7 @@ aws ssm get-parameter \
 
 ---
 
-## Cost profile (personal scale)
+## Cost estimates
 
 | Item | Approx. cost |
 |---|---|

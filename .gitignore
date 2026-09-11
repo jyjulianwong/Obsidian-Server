@@ -30,3 +30,6 @@ terraform/.placeholder-lambda.zip
 
 # Misc
 .DS_Store
+
+# Project
+TODO.md
