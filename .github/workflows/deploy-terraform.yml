@@ -3,11 +3,6 @@ name: Deploy Infrastructure & Lambda
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/**"
-      - "terraform/**"
-      - "server/**"
-      - "ca/ca.crt"
   pull_request:
     branches: [main]
     paths:
@@ -21,6 +16,24 @@ env:
   TF_VERSION: "1.9.0"
 
 jobs:
+  changes:
+    name: Detect Relevant Changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - ".github/**"
+              - "terraform/**"
+              - "server/**"
+              - "ca/ca.crt"
+
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
@@ -81,8 +94,11 @@ jobs:
 
   version_bump:
     name: Calendar Version Bump
+    needs: [changes]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.changes.outputs.relevant == 'true' || contains(github.event.head_commit.message, '[force-deploy]'))
     permissions:
       contents: write
     outputs:
@@ -107,9 +123,11 @@ jobs:
 
   deploy:
     name: Terraform Apply + Lambda Deploy
-    needs: [version_bump]
+    needs: [changes, version_bump]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.changes.outputs.relevant == 'true' || contains(github.event.head_commit.message, '[force-deploy]'))
 
     steps:
       - uses: actions/checkout@v4
