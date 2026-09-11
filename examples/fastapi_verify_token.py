@@ -16,12 +16,12 @@ import jwt
 from fastapi import Header, HTTPException
 from jwt import PyJWKClient
 
-OBSIDIAN_ISSUER = "https://auth.jyjwong.com"  # set to your Obsidian deployment
-JWKS_URL = f"{OBSIDIAN_ISSUER}/.well-known/jwks.json"
+OBSIDIAN_ISSUER = "https://auth.jyjwong.com"  # set to your Obsidian deployment — checked against the JWT's `iss` claim
+OBSIDIAN_JWKS_URL = "https://jwks.jyjwong.com/.well-known/jwks.json"  # set to your Obsidian deployment's public JWKS domain (terraform output jwks_url) — deliberately NOT under OBSIDIAN_ISSUER, which requires a client certificate
 
 # PyJWKClient caches keys in-memory and only re-fetches the JWKS when it sees
 # an unrecognized `kid` — cheap enough to construct once at import time.
-_jwk_client = PyJWKClient(JWKS_URL)
+_jwk_client = PyJWKClient(OBSIDIAN_JWKS_URL)
 
 
 def require_device(authorization: str = Header(...)) -> str:

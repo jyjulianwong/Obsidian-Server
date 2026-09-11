@@ -27,6 +27,12 @@ variable "allowed_origins" {
   default     = ""
 }
 
+variable "jwks_domain_name" {
+  description = "Public custom domain that serves only GET /.well-known/jwks.json, with no mTLS truststore attached — API Gateway can't exempt a single route from a domain's mTLS requirement, so resource servers without a device certificate need this separate domain to fetch Obsidian's public signing key. Must be a domain you control in Cloudflare."
+  type        = string
+  default     = "jwks.jyjwong.com"
+}
+
 variable "token_ttl_seconds" {
   description = "Lifetime of issued access tokens, in seconds"
   type        = number

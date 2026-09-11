@@ -1,17 +1,31 @@
 output "acm_certificate_validation_records" {
   description = "DNS records to add manually in Cloudflare (DNS only, grey cloud) before completing the apply — see README"
-  value = [
-    for o in aws_acm_certificate.auth_domain.domain_validation_options : {
-      name  = o.resource_record_name
-      type  = o.resource_record_type
-      value = o.resource_record_value
-    }
-  ]
+  value = concat(
+    [
+      for o in aws_acm_certificate.auth_domain.domain_validation_options : {
+        name  = o.resource_record_name
+        type  = o.resource_record_type
+        value = o.resource_record_value
+      }
+    ],
+    [
+      for o in aws_acm_certificate.jwks_domain.domain_validation_options : {
+        name  = o.resource_record_name
+        type  = o.resource_record_type
+        value = o.resource_record_value
+      }
+    ]
+  )
 }
 
 output "apigatewayv2_domain_target" {
   description = "Regional API Gateway domain — point your Cloudflare CNAME for var.domain_name at this (DNS only, grey cloud)"
   value       = aws_apigatewayv2_domain_name.auth.domain_name_configuration[0].target_domain_name
+}
+
+output "apigatewayv2_jwks_domain_target" {
+  description = "Regional API Gateway domain — point your Cloudflare CNAME for var.jwks_domain_name at this (DNS only, grey cloud)"
+  value       = aws_apigatewayv2_domain_name.jwks.domain_name_configuration[0].target_domain_name
 }
 
 output "truststore_bucket_name" {
@@ -35,8 +49,8 @@ output "issuer_url" {
 }
 
 output "jwks_url" {
-  description = "JWKS endpoint downstream services use to verify Obsidian-issued tokens"
-  value       = "${local.issuer}/.well-known/jwks.json"
+  description = "Public (non-mTLS) JWKS endpoint downstream services use to verify Obsidian-issued tokens — distinct from issuer_url, since the issuer's domain requires a client certificate"
+  value       = "https://${var.jwks_domain_name}/.well-known/jwks.json"
 }
 
 output "github_actions_access_key_id" {

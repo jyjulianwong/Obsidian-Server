@@ -74,6 +74,7 @@ jobs:
           terraform plan \
             -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" \
             -var="domain_name=${{ secrets.OBSIDIAN_DOMAIN_NAME }}" \
+            -var="jwks_domain_name=${{ secrets.OBSIDIAN_JWKS_DOMAIN_NAME }}" \
             -var="allowed_origins=${{ secrets.OBSIDIAN_ALLOWED_ORIGINS }}" \
             -no-color \
             -out=tfplan
@@ -163,6 +164,7 @@ jobs:
           terraform apply \
             -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" \
             -var="domain_name=${{ secrets.OBSIDIAN_DOMAIN_NAME }}" \
+            -var="jwks_domain_name=${{ secrets.OBSIDIAN_JWKS_DOMAIN_NAME }}" \
             -var="allowed_origins=${{ secrets.OBSIDIAN_ALLOWED_ORIGINS }}" \
             -auto-approve \
             -no-color

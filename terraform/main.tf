@@ -48,6 +48,23 @@ resource "aws_acm_certificate_validation" "auth_domain" {
   validation_record_fqdns = [for o in aws_acm_certificate.auth_domain.domain_validation_options : o.resource_record_name]
 }
 
+# ACM certificate for the public JWKS domain — same DNS-validation dance,
+# separate domain so it doesn't inherit the auth domain's mTLS truststore.
+
+resource "aws_acm_certificate" "jwks_domain" {
+  domain_name       = var.jwks_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_acm_certificate_validation" "jwks_domain" {
+  certificate_arn         = aws_acm_certificate.jwks_domain.arn
+  validation_record_fqdns = [for o in aws_acm_certificate.jwks_domain.domain_validation_options : o.resource_record_name]
+}
+
 # ---------------------------------------------------------------------------
 # S3 — mTLS truststore (holds the Obsidian device CA's public certificate)
 # ---------------------------------------------------------------------------
@@ -279,6 +296,67 @@ resource "aws_apigatewayv2_api_mapping" "auth" {
   api_id      = aws_apigatewayv2_api.auth.id
   domain_name = aws_apigatewayv2_domain_name.auth.id
   stage       = aws_apigatewayv2_stage.default.id
+}
+
+# ---------------------------------------------------------------------------
+# API Gateway — public JWKS domain, no mTLS
+#
+# mutual_tls_authentication on aws_apigatewayv2_domain_name.auth applies to
+# every route under that domain, not just /auth/token — API Gateway has no
+# way to exempt a single path from a domain's mTLS requirement. Resource
+# servers (e.g. another project's backend) need to fetch
+# /.well-known/jwks.json without a device certificate, so it gets its own
+# API + custom domain that never attaches a truststore. Same Lambda, just a
+# route restricted to GET /.well-known/jwks.json — /auth/token is never
+# wired into this API, so it isn't reachable here even without mTLS.
+# ---------------------------------------------------------------------------
+
+resource "aws_apigatewayv2_api" "jwks" {
+  name          = "${local.scoped_prefix}-jwks-api"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "jwks_lambda" {
+  api_id                 = aws_apigatewayv2_api.jwks.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.auth.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "jwks" {
+  api_id    = aws_apigatewayv2_api.jwks.id
+  route_key = "GET /.well-known/jwks.json"
+  target    = "integrations/${aws_apigatewayv2_integration.jwks_lambda.id}"
+}
+
+resource "aws_apigatewayv2_stage" "jwks" {
+  api_id      = aws_apigatewayv2_api.jwks.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "jwks_apigateway" {
+  statement_id  = "AllowJwksAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.auth.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.jwks.execution_arn}/*/*"
+}
+
+resource "aws_apigatewayv2_domain_name" "jwks" {
+  domain_name = var.jwks_domain_name
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.jwks_domain.certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+resource "aws_apigatewayv2_api_mapping" "jwks" {
+  api_id      = aws_apigatewayv2_api.jwks.id
+  domain_name = aws_apigatewayv2_domain_name.jwks.id
+  stage       = aws_apigatewayv2_stage.jwks.id
 }
 
 # ---------------------------------------------------------------------------

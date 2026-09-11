@@ -24,8 +24,11 @@ Lambda — FastAPI app (server/)
 Device stores the token, calls your other projects' APIs with
   Authorization: Bearer <token>
   ▼
-Your other projects verify the JWT locally via Obsidian's JWKS endpoint
-  (GET /.well-known/jwks.json) — no call back to Obsidian per request
+Your other projects verify the JWT locally via Obsidian's JWKS endpoint,
+  served on a SEPARATE public domain with no mTLS (jwks.jyjwong.com) —
+  API Gateway can't exempt one route from a domain's mTLS requirement,
+  and resource servers verifying tokens don't have a device certificate.
+  No call back to Obsidian per request either way.
 ```
 
 | Piece | Role |
@@ -33,11 +36,12 @@ Your other projects verify the JWT locally via Obsidian's JWKS endpoint
 | Private CA (`ca/ca.key` / `ca/ca.crt`) | Your own root of trust — signs every device certificate |
 | Device certs (`devices/<id>/`) | One keypair + signed cert per authorized device |
 | S3 truststore bucket | Holds `ca.crt`; referenced by the API Gateway custom domain |
-| API Gateway custom domain | Terminates TLS, verifies client certs against the truststore |
+| API Gateway custom domain (`auth.jyjwong.com`) | Terminates TLS, verifies client certs against the truststore; serves `/auth/token` |
+| API Gateway public domain (`jwks.jyjwong.com`) | Same Lambda, no truststore; serves only `GET /.well-known/jwks.json` for resource servers without a device cert |
 | Lambda (Mangum + FastAPI + authlib) | Runs the auth service; issues JWTs, serves JWKS |
 | JWT signing keypair | Separate from the CA — Terraform-generated, stored in SSM |
 | DynamoDB devices table | `device_id → active/revoked` — your app-level kill switch |
-| Cloudflare domain | DNS only (grey cloud), points the custom domain at API Gateway |
+| Cloudflare domains | DNS only (grey cloud), point both custom domains at API Gateway |
 
 ## Repository layout
 
@@ -103,9 +107,9 @@ cd ../..
 
 This creates `ca/ca.key` (sensitive — never commit it, back it up offline) and `ca/ca.crt` (public — this one **is** committed, Terraform uploads it as the mTLS truststore).
 
-### 4. Terraform: Phase 1 — create the ACM certificate only
+### 4. Terraform: Phase 1 — create the ACM certificates only
 
-The custom domain needs a validated ACM certificate before it can exist, and DNS validation for a Cloudflare-hosted domain can't be automated by Terraform (Cloudflare isn't the AWS-integrated DNS provider). So this is done in two phases.
+Both custom domains need a validated ACM certificate before they can exist, and DNS validation for a Cloudflare-hosted domain can't be automated by Terraform (Cloudflare isn't the AWS-integrated DNS provider). So this is done in two phases.
 
 ```bash
 cd terraform
@@ -115,15 +119,17 @@ terraform init \
 
 terraform apply \
   -target=aws_acm_certificate.auth_domain \
+  -target=aws_acm_certificate.jwks_domain \
   -var="aws_account_id=$ACCOUNT_ID" \
-  -var="domain_name=auth.jyjwong.com"
+  -var="domain_name=auth.jyjwong.com" \
+  -var="jwks_domain_name=jwks.jyjwong.com"
 
 terraform output acm_certificate_validation_records
 ```
 
-### 5. Add the ACM validation record to Cloudflare
+### 5. Add the ACM validation records to Cloudflare
 
-In the Cloudflare dashboard for your domain → **DNS**, add the CNAME record printed above:
+In the Cloudflare dashboard for your domain → **DNS**, add both CNAME records printed above (one per domain):
 
 | Type | Name | Content | Proxy status |
 |---|---|---|---|
@@ -137,10 +143,11 @@ Wait a few minutes for DNS propagation and ACM validation (usually well under 10
 terraform apply \
   -var="aws_account_id=$ACCOUNT_ID" \
   -var="domain_name=auth.jyjwong.com" \
+  -var="jwks_domain_name=jwks.jyjwong.com" \
   -var="allowed_origins=https://app.jyjwong.com,http://localhost:3000"
 ```
 
-This creates the truststore bucket, the JWT signing key (in SSM), the devices table, the Lambda function (placeholder code — see step 8), and the mTLS-enabled API Gateway custom domain.
+This creates the truststore bucket, the JWT signing key (in SSM), the devices table, the Lambda function (placeholder code — see step 8), the mTLS-enabled API Gateway custom domain, and the separate public (no-mTLS) API Gateway domain that serves just the JWKS route.
 
 ```bash
 terraform output apigatewayv2_domain_target
@@ -148,13 +155,14 @@ terraform output apigatewayv2_domain_target
 
 ### 7. Point Cloudflare at API Gateway — human action
 
-In Cloudflare **DNS**, add another record:
+In Cloudflare **DNS**, add two more records — one per custom domain:
 
 | Type | Name | Content | Proxy status |
 |---|---|---|---|
 | CNAME | `auth` (or your chosen subdomain) | (from `apigatewayv2_domain_target`) | **DNS only** (grey cloud) |
+| CNAME | `jwks` (or your chosen subdomain) | (from `apigatewayv2_jwks_domain_target`) | **DNS only** (grey cloud) |
 
-**Important:** this must stay grey-cloud (DNS only). A proxied (orange-cloud) record terminates TLS at Cloudflare's edge, which breaks client-certificate verification — the client cert would never reach API Gateway.
+**Important:** both must stay grey-cloud (DNS only). A proxied (orange-cloud) record terminates TLS at Cloudflare's edge — for `auth.jyjwong.com` that breaks client-certificate verification (the client cert would never reach API Gateway); for `jwks.jyjwong.com` it's not strictly required for security, but keep it consistent so ACM's TLS cert on the origin stays the one actually presented.
 
 ### 8. Deploy the real Lambda code (manually for the first time only)
 
@@ -235,6 +243,7 @@ In your GitHub repository → **Settings → Secrets and variables → Actions**
 | `AWS_ACCESS_KEY_ID` | `terraform output github_actions_access_key_id` |
 | `AWS_SECRET_ACCESS_KEY` | `terraform output -raw github_actions_secret_access_key` |
 | `OBSIDIAN_DOMAIN_NAME` | e.g. `auth.jyjwong.com` |
+| `OBSIDIAN_JWKS_DOMAIN_NAME` | e.g. `jwks.jyjwong.com` |
 | `OBSIDIAN_ALLOWED_ORIGINS` | e.g. `https://app.jyjwong.com,http://localhost:3000` |
 
 From here on, every push to `main` touching `server/`, `terraform/`, or `ca/ca.crt` runs `terraform apply` and redeploys the Lambda automatically.
@@ -247,7 +256,7 @@ Files in `examples/` are meant to be copied into your other projects, not run fr
 
 ### A backend API that should trust Obsidian tokens
 
-Copy `examples/fastapi_verify_token.py` into the project, set `OBSIDIAN_ISSUER`, and use it as a FastAPI dependency:
+Copy `examples/fastapi_verify_token.py` into the project, set `OBSIDIAN_ISSUER` and `OBSIDIAN_JWKS_URL`, and use it as a FastAPI dependency:
 
 ```python
 from fastapi_verify_token import require_device
@@ -257,7 +266,7 @@ def reports(device_id: str = Depends(require_device)):
     ...
 ```
 
-It verifies the JWT's RS256 signature against Obsidian's JWKS (`/.well-known/jwks.json`) locally — no network round-trip to Obsidian per request. (Not using FastAPI? The same JWKS-based verification works with any language's standard JWT library — the only Obsidian-specific pieces are the issuer URL and the JWKS endpoint path.)
+It verifies the JWT's RS256 signature against Obsidian's JWKS locally — no network round-trip to Obsidian per request. **Fetch the JWKS from `OBSIDIAN_JWKS_URL` (the `jwks.jyjwong.com` domain — `terraform output jwks_url`), not from a path under `OBSIDIAN_ISSUER`.** The issuer's domain (`auth.jyjwong.com`) requires a client certificate for every route, including `/.well-known/jwks.json` — a resource server with no device cert of its own will get a TLS-level connection reset trying to fetch JWKS from there. `OBSIDIAN_ISSUER` is still needed separately, to check the JWT's `iss` claim. (Not using FastAPI? The same split — JWKS from the public domain, `iss` checked against the mTLS domain — works with any language's standard JWT library.)
 
 ### A UI that should get a token silently
 
