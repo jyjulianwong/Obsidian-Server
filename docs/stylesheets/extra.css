@@ -1,0 +1,232 @@
+/* ---------------------------------------------------------------------- */
+/* Obsidian docs — custom theme                                           */
+/* A minimalist, dark-glass palette layered on top of Material for MkDocs */
+/* ---------------------------------------------------------------------- */
+
+:root {
+  --obsidian-violet: #8b5cf6;
+  --obsidian-violet-bright: #b794f6;
+  --obsidian-violet-dim: #6b46c1;
+}
+
+/* ----- Palette refinements -------------------------------------------- */
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0b0710;
+  --md-default-fg-color: #e6e1ec;
+  --md-default-fg-color--light: #b9b0c6;
+  --md-default-fg-color--lighter: #8a8095;
+
+  --md-primary-fg-color: #0b0710;
+  --md-primary-bg-color: #f2edf9;
+
+  --md-accent-fg-color: var(--obsidian-violet-bright);
+  --md-accent-fg-color--transparent: rgba(183, 148, 246, 0.1);
+
+  --md-typeset-a-color: var(--obsidian-violet-bright);
+
+  --md-code-bg-color: #150f1e;
+  --md-code-fg-color: #d9d2e4;
+
+  --md-footer-bg-color: #0b0710;
+  --md-footer-bg-color--dark: #060409;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #0b0710;
+  --md-primary-bg-color: #f2edf9;
+
+  --md-accent-fg-color: var(--obsidian-violet-dim);
+  --md-accent-fg-color--transparent: rgba(107, 70, 193, 0.08);
+
+  --md-typeset-a-color: var(--obsidian-violet-dim);
+
+  --md-footer-bg-color: #0b0710;
+  --md-footer-bg-color--dark: #060409;
+}
+
+/* Header + tabs stay a near-black "obsidian" bar in both palettes */
+.md-header,
+.md-tabs {
+  background-color: #0b0710;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.md-header__title,
+.md-tabs__link {
+  color: #ece7f4;
+}
+
+.md-tabs__link--active {
+  color: var(--obsidian-violet-bright);
+}
+
+.md-header__button.md-logo img {
+  filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.45));
+}
+
+/* ----- Typography ------------------------------------------------------ */
+
+.md-typeset h1,
+.md-typeset h2 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset h1 {
+  background: linear-gradient(120deg, var(--obsidian-violet-bright), var(--obsidian-violet-dim));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ----- Code blocks ------------------------------------------------------ */
+
+.md-typeset pre > code {
+  border-radius: 8px;
+}
+
+.md-typeset .highlight {
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 8px;
+}
+
+/* ----- Admonitions: quieter, glassy ------------------------------------- */
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 10px;
+  border-width: 1px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Hero (docs/index.md)                                                    */
+/* ---------------------------------------------------------------------- */
+
+.obsidian-hero {
+  position: relative;
+  margin: -0.6rem -0.8rem 2.5rem;
+  padding: 4.5rem 1.5rem 3.5rem;
+  text-align: center;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.obsidian-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.22), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(139, 92, 246, 0.14), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(139, 92, 246, 0.1), transparent 55%);
+}
+
+.obsidian-hero__logo {
+  width: 88px;
+  height: auto;
+  margin-bottom: 1.25rem;
+  filter: drop-shadow(0 0 18px rgba(139, 92, 246, 0.5));
+  image-rendering: -webkit-optimize-contrast;
+}
+
+.obsidian-hero h1 {
+  font-size: 2.6rem;
+  margin: 0 auto 0.75rem;
+  max-width: 30ch;
+}
+
+.obsidian-hero p {
+  font-size: 1.15rem;
+  max-width: 46ch;
+  margin: 0 auto;
+  color: var(--md-default-fg-color--light);
+}
+
+.obsidian-hero__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.obsidian-hero__actions .md-button {
+  border-radius: 8px;
+}
+
+.obsidian-hero__actions .md-button--primary {
+  background: linear-gradient(120deg, var(--obsidian-violet-bright), var(--obsidian-violet-dim));
+  border: none;
+  color: #fff;
+}
+
+.obsidian-hero__actions .md-button--primary:hover {
+  filter: brightness(1.1);
+}
+
+/* ----- Feature grid ------------------------------------------------------ */
+
+.obsidian-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.obsidian-card {
+  padding: 1.25rem 1.4rem;
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: 12px;
+  background: rgba(139, 92, 246, 0.04);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.obsidian-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.obsidian-card .twemoji,
+.obsidian-card__icon {
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.obsidian-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.obsidian-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--md-default-fg-color--light);
+}
+
+/* ----- Language pills used on the API Examples pages --------------------- */
+
+.obsidian-pill {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--obsidian-violet-bright);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+@media screen and (max-width: 44.9375em) {
+  .obsidian-hero {
+    padding: 3rem 1rem 2.5rem;
+  }
+
+  .obsidian-hero h1 {
+    font-size: 2rem;
+  }
+}
