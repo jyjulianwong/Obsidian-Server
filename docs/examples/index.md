@@ -1,4 +1,4 @@
-# API Examples
+# API examples
 
 Every project that integrates with Obsidian falls into one of two roles.
 Pick the one that matches what you're building — most projects only need

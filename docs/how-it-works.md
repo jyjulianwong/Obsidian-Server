@@ -69,7 +69,7 @@ Two details matter here:
   equivalent) fetches the JWKS once and re-fetches only if it sees an
   unrecognized `kid` — there's no per-request network call to Obsidian.
 
-See the **[API Examples](examples/index.md)** for what this looks like in
+See the **[API examples](examples/index.md)** for what this looks like in
 actual code.
 
 ## Revocation

@@ -135,6 +135,15 @@
   font-size: 2.6rem;
   margin: 0 auto 0.75rem;
   max-width: 30ch;
+  text-wrap: balance;
+}
+
+/* MkDocs' auto-generated permalink anchor is invisible (opacity: 0 until
+   hover) but still occupies inline width — on a centered, wrapped heading
+   it rides along on the last line and pushes the visible text off-center.
+   Not needed on a display heading anyway, so drop it from layout. */
+.obsidian-hero h1 .headerlink {
+  display: none;
 }
 
 .obsidian-hero p {
@@ -145,14 +154,15 @@
 }
 
 .obsidian-hero__actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
   margin-top: 2rem;
-  flex-wrap: wrap;
+  text-align: center;
 }
 
+/* Both buttons render as inline-block links inside one <p>, not separate
+   flex items — margin (not flex gap) is what keeps them apart whether
+   they sit side by side or wrap onto their own lines on narrow screens. */
 .obsidian-hero__actions .md-button {
+  margin: 0.375rem;
   border-radius: 8px;
 }
 
@@ -207,7 +217,7 @@
   color: var(--md-default-fg-color--light);
 }
 
-/* ----- Language pills used on the API Examples pages --------------------- */
+/* ----- Language pills used on the API examples pages --------------------- */
 
 .obsidian-pill {
   display: inline-block;
@@ -227,6 +237,12 @@
   }
 
   .obsidian-hero h1 {
-    font-size: 2rem;
+    font-size: 1.8rem;
+  }
+}
+
+@media screen and (max-width: 22.5em) {
+  .obsidian-hero h1 {
+    font-size: 1.55rem;
   }
 }
