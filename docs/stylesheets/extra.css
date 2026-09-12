@@ -138,6 +138,14 @@
   text-wrap: balance;
 }
 
+/* MkDocs' auto-generated permalink anchor is invisible (opacity: 0 until
+   hover) but still occupies inline width — on a centered, wrapped heading
+   it rides along on the last line and pushes the visible text off-center.
+   Not needed on a display heading anyway, so drop it from layout. */
+.obsidian-hero h1 .headerlink {
+  display: none;
+}
+
 .obsidian-hero p {
   font-size: 1.15rem;
   max-width: 46ch;
