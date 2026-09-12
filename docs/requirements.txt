@@ -1,0 +1,7 @@
+# Pinned dependencies for building the docs/ site with MkDocs + Material.
+# Used by `.github/workflows/deploy-docs.yml` and for local previews:
+#   pip install -r docs/requirements.txt
+#   mkdocs serve
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+pymdown-extensions==11.0.2

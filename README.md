@@ -2,6 +2,8 @@
 
 A personal, central auth service that silently authenticates your own pre-authorized devices (laptops, phones, servers) using **mutual TLS (mTLS)** and issues short-lived JWT access tokens for your other projects' APIs to trust. No password, no per-device login script — the device's installed certificate proves its identity during the TLS handshake itself.
 
+📖 **[Docs site](https://jyjulianwong.github.io/Obsidian-Server/)** — what Obsidian is, how the token flow works, and copy-paste API examples in Python and JavaScript. This README covers deploying Obsidian itself.
+
 ## Who is this for?
 
 I run several small personal projects, each with its own UI and API. I didn't want to bolt a separate login system onto each one, and I didn't want a shared password floating between them either. Obsidian is the one place that knows which of my devices are allowed to act on my behalf; every other project just verifies the token Obsidian issued and gets on with its own job.
@@ -309,11 +311,29 @@ curl -X POST http://localhost:8000/auth/token -H "X-Dev-Device-Id: my-laptop"
 
 ---
 
+## Docs site
+
+The [docs site](https://jyjulianwong.github.io/Obsidian-Server/) (`docs/`, built with [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)) covers what Obsidian is and how to integrate it, as opposed to this README's focus on deploying Obsidian itself. Preview it locally:
+
+```bash
+pip install -r docs/requirements.txt
+mkdocs serve
+```
+
+Then open <http://127.0.0.1:8000>. Pages live under `docs/`; the Python and JavaScript example pages pull their code blocks directly from `examples/` via `pymdownx.snippets`, so they can't drift out of sync.
+
+---
+
 ## CI/CD
 
 `.github/workflows/deploy-terraform.yml`:
 - **On PR** (touching `terraform/`, `server/`, or `ca/ca.crt`): runs `terraform plan` and posts the output as a PR comment.
 - **On merge to `main`**: bumps a calendar version and tags it (`version_bump`), then — checked out at that tag — runs `terraform apply` and builds + deploys the real Lambda package (`deploy`).
+
+`.github/workflows/deploy-docs.yml`:
+- **On PR** (touching `docs/`, `examples/`, `mkdocs.yml`, or `README.md`): builds the [docs site](https://jyjulianwong.github.io/Obsidian-Server/) with `mkdocs build --strict` to catch broken links/snippets before merge.
+- **On merge to `main`**: builds and deploys the site to GitHub Pages via `actions/deploy-pages`.
+- **One-time setup:** in the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
 
 ### Versioning
 

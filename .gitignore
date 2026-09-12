@@ -28,6 +28,9 @@ server/build/
 server/*.zip
 terraform/.placeholder-lambda.zip
 
+# Docs site build output
+site/
+
 # Misc
 .DS_Store
 
