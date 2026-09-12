@@ -62,5 +62,5 @@ and ends at "devices I have personally provisioned a certificate for."
 ## Next
 
 Continue to **[How it works](how-it-works.md)** for the full request path,
-or jump straight to the **[API Examples](examples/index.md)** if you just
+or jump straight to the **[API examples](examples/index.md)** if you just
 want to integrate a project against an existing Obsidian deployment.

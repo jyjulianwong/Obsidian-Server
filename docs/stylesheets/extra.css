@@ -145,14 +145,15 @@
 }
 
 .obsidian-hero__actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
   margin-top: 2rem;
-  flex-wrap: wrap;
+  text-align: center;
 }
 
+/* Both buttons render as inline-block links inside one <p>, not separate
+   flex items — margin (not flex gap) is what keeps them apart whether
+   they sit side by side or wrap onto their own lines on narrow screens. */
 .obsidian-hero__actions .md-button {
+  margin: 0.375rem;
   border-radius: 8px;
 }
 
@@ -207,7 +208,7 @@
   color: var(--md-default-fg-color--light);
 }
 
-/* ----- Language pills used on the API Examples pages --------------------- */
+/* ----- Language pills used on the API examples pages --------------------- */
 
 .obsidian-pill {
   display: inline-block;

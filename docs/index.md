@@ -18,7 +18,7 @@ without ever calling Obsidian back.
 
 <div class="obsidian-hero__actions" markdown>
 [What is Obsidian?](what-is-obsidian.md){ .md-button .md-button--primary }
-[API Examples](examples/index.md){ .md-button }
+[API examples](examples/index.md){ .md-button }
 </div>
 
 </div>
@@ -65,7 +65,7 @@ request fails instantly — no cert rotation required.
   the vocabulary (mTLS, device certs, JWTs, JWKS) used throughout these docs.
 - **[How it works](how-it-works.md)** — the request path from a device's
   handshake to a verified API call, with a diagram.
-- **[API Examples](examples/index.md)** — copy-paste snippets for
+- **[API examples](examples/index.md)** — copy-paste snippets for
   integrating Obsidian into your own Python and JavaScript projects.
 
 !!! tip "Looking for deployment instructions?"

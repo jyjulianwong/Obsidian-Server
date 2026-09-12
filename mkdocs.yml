@@ -11,7 +11,7 @@ nav:
   - Home: index.md
   - What is Obsidian?: what-is-obsidian.md
   - How it works: how-it-works.md
-  - API Examples:
+  - API examples:
       - Overview: examples/index.md
       - Python: examples/python.md
       - JavaScript: examples/javascript.md
