@@ -18,10 +18,10 @@ nav:
 
 theme:
   name: material
-  logo: assets/logo.svg
-  favicon: assets/favicon.svg
+  logo: assets/logo.png
+  favicon: assets/favicon.png
   font:
-    text: Inter
+    text: Open Sans
     code: JetBrains Mono
   icon:
     repo: fontawesome/brands/github

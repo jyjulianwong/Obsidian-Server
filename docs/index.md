@@ -7,7 +7,7 @@ hide:
 
 <div class="obsidian-hero" markdown>
 
-![Obsidian](assets/logo.svg){ .obsidian-hero__logo }
+![Obsidian](assets/logo.png){ .obsidian-hero__logo }
 
 # One certificate. Every project trusts you.
 

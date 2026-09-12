@@ -124,10 +124,11 @@
 }
 
 .obsidian-hero__logo {
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: auto;
   margin-bottom: 1.25rem;
   filter: drop-shadow(0 0 18px rgba(139, 92, 246, 0.5));
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .obsidian-hero h1 {
