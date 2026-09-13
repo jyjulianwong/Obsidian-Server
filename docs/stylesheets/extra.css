@@ -173,7 +173,7 @@
 
 .obsidian-hero__actions .md-button--primary {
   background: linear-gradient(120deg, var(--obsidian-violet-bright), var(--obsidian-violet-dim));
-  border: none;
+  border: 0.1rem solid transparent;
   color: #fff;
 }
 
