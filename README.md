@@ -220,7 +220,12 @@ No output is success. A "Mac verify error" here means the two prompts in step 1 
   ```
   `-c` matches on the certificate's own Subject Common Name (`CN=<device_id>`, the identity `provision_device.py` issued) — not the `"Obsidian: <device_id>"` friendly name `generate_mtls_bundle.sh` sets on the `.p12`. Keychain only surfaces that friendly name for the private-key row; the certificate row (and everything `security` searches by `-c`) always uses the embedded CN. If the name isn't unique (e.g. the same device was provisioned twice), this refuses and asks for a SHA-256 hash instead — get one with `security find-certificate -c "$DEVICE_ID" -Z ~/Library/Keychains/login.keychain-db`, then pass it as `-Z <hash>` instead of `-c`. This only removes the certificate from Keychain — it doesn't revoke the device itself; see [Revocation](#revocation) for that.
 - **Windows:** Double-click the `.p12` → Certificate Import Wizard → Store it under "Personal".
-- **iOS / Android:** AirDrop or email the `.p12` to the device, then open it — Settings → General → VPN & Device Management will offer to install it (enter the export password).
+- **iOS:** AirDropping/emailing the raw `.p12` installs it as a bare "Identity Certificate" in Settings → VPN & Device Management, indistinguishable from other profiles. Wrap it in a proper configuration profile first:
+  ```bash
+  ./scripts/generate_ios_profile.sh $DEVICE_ID
+  ```
+  This writes `devices/$DEVICE_ID/$DEVICE_ID.mobileconfig` with a `PayloadDisplayName`/`PayloadDescription` set (`"Obsidian: $DEVICE_ID"`). AirDrop or email that `.mobileconfig` instead — Settings will still prompt for the export password, but the installed profile is now clearly labeled. It'll show as "Not Signed" (we don't sign profiles) — that's expected for a self-generated one.
+- **Android:** AirDrop or email the `.p12` to the device, then open it — Settings will offer to install it (enter the export password).
 - **Linux (NSS-based browsers, e.g. Chrome):** `chrome://settings/certificates` → **Your certificates** → **Import** → Select the `.p12`.
 
 Optional, for a fully silent flow on a device you manage: some browsers support pre-selecting the client certificate for a given origin via enterprise policy (e.g. Chrome's `AutoSelectCertificateForUrls`), so the OS-level cert picker never appears. The exact mechanism is OS/browser-version specific — search for that policy name plus your OS if you want it; it's a convenience, not a requirement (a picker you dismiss once per browser profile is otherwise the norm).
@@ -290,7 +295,7 @@ Copy `examples/python_client_get_token.py`, point `DEVICE_CERT` at a provisioned
     --table-name "$(terraform -chdir=terraform output -raw devices_table_name)"
   ```
   `/auth/token` refuses the device on its very next request; already-issued tokens still expire naturally within `token_ttl_seconds` (default 1 hour).
-- **Certificate expiry:** device certs are short-lived (90 days by default — see `scripts/provision_device.py --days`), so a device you forget to revoke stops working on its own.
+- **Certificate expiry:** device certs default to a 36500-day (~100 year) validity (see `scripts/provision_device.py --days`) — there's no CRL/OCSP, so expiry isn't a meaningful safety net at that length and the DynamoDB `active`/`revoked` check above is the only real revocation path. Pass a shorter `--days` at provisioning time if you want certs to lapse on their own.
 - **Rotating the CA itself** (only if the CA key is compromised — not needed for revoking one device): regenerate `ca/ca.crt`, `terraform apply` to re-upload it and bump `truststore_version`, then re-issue every device's certificate against the new CA.
 
 ---

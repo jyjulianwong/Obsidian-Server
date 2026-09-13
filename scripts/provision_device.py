@@ -30,7 +30,9 @@ CA_DIR = ROOT / "ca"
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("device_id", help="Unique device identifier — becomes the certificate's CN")
-    parser.add_argument("--days", type=int, default=90, help="Certificate validity in days (default: 90)")
+    parser.add_argument(
+        "--days", type=int, default=36500, help="Certificate validity in days (default: 36500, ~100 years)"
+    )
     parser.add_argument("--table-name", required=True, help="DynamoDB devices table name")
     parser.add_argument("--region", default="eu-west-2")
     args = parser.parse_args()
@@ -52,7 +54,7 @@ def main() -> None:
             "openssl", "req", "-new",
             "-key", str(key_path),
             "-out", str(csr_path),
-            "-subj", f"/CN={args.device_id}",
+            "-subj", f"/O=Obsidian/OU=Device Certificates/CN={args.device_id}",
         ],
         check=True,
     )
