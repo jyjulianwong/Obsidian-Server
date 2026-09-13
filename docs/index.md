@@ -1,5 +1,4 @@
 ---
-title: Obsidian
 hide:
   - navigation
   - toc
