@@ -8,7 +8,7 @@ import auth
 import devices
 from mtls import get_verified_device_id
 
-app = FastAPI(title="Obsidian Auth Service")
+app = FastAPI(title="Obsidian")
 
 _allowed_origins = [
     origin.strip()
