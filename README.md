@@ -38,7 +38,7 @@ Your other projects verify the JWT locally via Obsidian's JWKS endpoint,
 | Private CA (`ca/ca.key` / `ca/ca.crt`) | Your own root of trust — signs every device certificate |
 | Device certs (`devices/<id>/`) | One keypair + signed cert per authorized device |
 | S3 truststore bucket | Holds `ca.crt`; referenced by the API Gateway custom domain |
-| API Gateway custom domain (`auth.jyjwong.com`) | Terminates TLS, verifies client certs against the truststore; serves `/auth/token` |
+| API Gateway custom domain (`auth.jyjwong.com`) | Terminates TLS, verifies client certs against the truststore; serves `/auth/token` and `/.well-known/openid-configuration` |
 | API Gateway public domain (`jwks.jyjwong.com`) | Same Lambda, no truststore; serves only `GET /.well-known/jwks.json` for resource servers without a device cert |
 | Lambda (Mangum + FastAPI + authlib) | Runs the auth service; issues JWTs, serves JWKS |
 | JWT signing keypair | Separate from the CA — Terraform-generated, stored in SSM |
@@ -275,6 +275,8 @@ def reports(device_id: str = Depends(require_device)):
 ```
 
 It verifies the JWT's RS256 signature against Obsidian's JWKS locally — no network round-trip to Obsidian per request. **Fetch the JWKS from `OBSIDIAN_JWKS_URL` (the `jwks.jyjwong.com` domain — `terraform output jwks_url`), not from a path under `OBSIDIAN_ISSUER`.** The issuer's domain (`auth.jyjwong.com`) requires a client certificate for every route, including `/.well-known/jwks.json` — a resource server with no device cert of its own will get a TLS-level connection reset trying to fetch JWKS from there. `OBSIDIAN_ISSUER` is still needed separately, to check the JWT's `iss` claim. (Not using FastAPI? The same split — JWKS from the public domain, `iss` checked against the mTLS domain — works with any language's standard JWT library.)
+
+Obsidian also publishes `/.well-known/openid-configuration` (`terraform output openid_configuration_url`) — but it lives under the issuer like `/auth/token` does, so fetching it also requires a device client certificate. That's the OIDC/RFC 8414 convention (the discovery document must live at a fixed path under the issuer, and its `issuer` field must match the URL used to fetch it), but it means the endpoint isn't useful for the plain resource-server case above: a service with no device cert still needs `OBSIDIAN_JWKS_URL` out of band rather than discovering it. Treat the discovery document as being for tooling that already holds a device certificate (or the OAuth/OIDC-metadata-aware libraries that expect it to exist at that path), not as a way to avoid distributing `jwks_url` separately.
 
 ### A UI that should get a token silently
 

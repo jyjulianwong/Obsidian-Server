@@ -48,4 +48,9 @@ def jwks():
     return auth.jwks()
 
 
+@app.get("/.well-known/openid-configuration")
+def openid_configuration():
+    return auth.openid_configuration()
+
+
 handler = Mangum(app, lifespan="off")
