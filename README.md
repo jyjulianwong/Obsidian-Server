@@ -2,7 +2,7 @@
 
 A personal, central auth service that silently authenticates your own pre-authorized devices (laptops, phones, servers) using **mutual TLS (mTLS)** and issues short-lived JWT access tokens for your other projects' APIs to trust. No password, no per-device login script — the device's installed certificate proves its identity during the TLS handshake itself.
 
-📖 **[Docs site](https://jyjulianwong.github.io/Obsidian-Server/)** — what Obsidian is, how the token flow works, and copy-paste API examples in Python and JavaScript. This README covers deploying Obsidian itself.
+📖 **[Read the official documentation](https://jyjulianwong.github.io/Obsidian-Server/)** — what Obsidian is, how the token flow works, and copy-paste API examples in Python and JavaScript. This README covers deploying Obsidian itself.
 
 ## Who is this for?
 
