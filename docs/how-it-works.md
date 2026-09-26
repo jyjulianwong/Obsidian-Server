@@ -72,6 +72,21 @@ Two details matter here:
 See the **[API examples](examples/index.md)** for what this looks like in
 actual code.
 
+### A note on `/.well-known/openid-configuration`
+
+Obsidian also serves an OIDC/RFC 8414-style discovery document — but at
+`https://auth.jyjwong.com/.well-known/openid-configuration`, not on the JWKS
+domain. That placement isn't a choice: the discovery spec requires the
+document to live at a fixed path under the *issuer*, and requires the
+`issuer` field inside it to match the URL it was fetched from. Since
+`auth.jyjwong.com` is the issuer, and mTLS applies to every route under it,
+the discovery document itself needs a device certificate to fetch — even
+though its own `jwks_uri` field points at the certificate-free
+`jwks.jyjwong.com`. A resource server with no device cert can't bootstrap
+itself from discovery; it still needs `jwks_url` distributed out of band,
+exactly as described above. Treat this endpoint as being for tooling that
+already holds a device certificate, not as a replacement for that.
+
 ## Revocation
 
 Because the trust decision (active vs. revoked) lives in DynamoDB rather

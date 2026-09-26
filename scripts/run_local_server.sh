@@ -10,6 +10,7 @@ uv sync
 
 OBSIDIAN_DEV_MODE=1 \
 OBSIDIAN_ISSUER="http://localhost:8000" \
+OBSIDIAN_JWKS_URI="http://localhost:8000/.well-known/jwks.json" \
 OBSIDIAN_SIGNING_KEY_SSM_PARAM="${OBSIDIAN_SIGNING_KEY_SSM_PARAM:?set to terraform output jwt signing key param name, e.g. /jyjulianwong-obsidian/jwt_signing_key}" \
 OBSIDIAN_DEVICES_TABLE_NAME="${OBSIDIAN_DEVICES_TABLE_NAME:?set to \$(terraform -chdir=../terraform output -raw devices_table_name)}" \
 OBSIDIAN_ALLOWED_ORIGINS="http://localhost:3000" \

@@ -25,6 +25,7 @@ locals {
   global_prefix = "${var.aws_account_id}-${var.project}" # S3 buckets (globally scoped)
   scoped_prefix = var.project                            # all other resources (account-scoped)
   issuer        = "https://${var.domain_name}"
+  jwks_url      = "https://${var.jwks_domain_name}/.well-known/jwks.json"
 }
 
 # ---------------------------------------------------------------------------
@@ -222,6 +223,7 @@ resource "aws_lambda_function" "auth" {
   environment {
     variables = {
       OBSIDIAN_ISSUER                = local.issuer
+      OBSIDIAN_JWKS_URI              = local.jwks_url
       OBSIDIAN_SIGNING_KEY_SSM_PARAM = aws_ssm_parameter.jwt_signing_key.name
       OBSIDIAN_DEVICES_TABLE_NAME    = aws_dynamodb_table.devices.name
       OBSIDIAN_ALLOWED_ORIGINS       = var.allowed_origins

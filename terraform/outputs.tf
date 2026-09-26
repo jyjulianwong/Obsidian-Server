@@ -50,7 +50,12 @@ output "issuer_url" {
 
 output "jwks_url" {
   description = "Public (non-mTLS) JWKS endpoint downstream services use to verify Obsidian-issued tokens — distinct from issuer_url, since the issuer's domain requires a client certificate"
-  value       = "https://${var.jwks_domain_name}/.well-known/jwks.json"
+  value       = local.jwks_url
+}
+
+output "openid_configuration_url" {
+  description = "OAuth/OIDC discovery document — lives under issuer_url like /auth/token, so fetching it requires a device client certificate. jwks_uri inside it points at jwks_url, not a path under the issuer."
+  value       = "${local.issuer}/.well-known/openid-configuration"
 }
 
 output "github_actions_access_key_id" {
