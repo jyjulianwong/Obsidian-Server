@@ -272,18 +272,18 @@ body::before {
   background: var(--md-accent-fg-color--transparent) !important;
 }
 
-/* Material also masks the sticky section header with an opaque blurred
-   div (.md-nav__container) sized to the page background, which shows up
-   as a solid black glow on our translucent glass sidebar */
-.md-sidebar .md-nav__container {
-  box-shadow: none !important;
-  background: none !important;
-}
-
+/* Material pins several different elements to the top of a scrolling nav
+   panel (the section .md-nav__title, and - when navigation.sections lifts
+   an active section whose own entry has no children to list below it -
+   the active item's .md-nav__link itself) and gives each one a halo sized
+   to the page background so scrolled content doesn't show through. On our
+   translucent glass sidebar that halo is opaque and reads as a solid
+   black box, so every sticky variant needs it stripped. */
 .md-sidebar .md-nav__title,
 .md-sidebar .md-nav__title[for],
 .md-sidebar .md-nav--secondary .md-nav__title,
-.md-sidebar .md-nav--primary > .md-nav__title {
+.md-sidebar .md-nav--primary > .md-nav__title,
+.md-sidebar .md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link {
   background: none !important;
   box-shadow: none !important;
 }
