@@ -3,7 +3,6 @@ site_description: A personal, central auth service that silently authenticates y
 site_url: https://jyjulianwong.github.io/Obsidian-Server/
 repo_name: jyjulianwong/Obsidian-Server
 repo_url: https://github.com/jyjulianwong/Obsidian-Server
-edit_uri: edit/main/docs/
 
 docs_dir: docs
 
@@ -21,7 +20,7 @@ theme:
   logo: assets/logo.png
   favicon: assets/logo.png
   font:
-    text: Open Sans
+    text: IBM Plex Sans
     code: JetBrains Mono
   icon:
     repo: fontawesome/brands/github
@@ -51,6 +50,7 @@ theme:
     - navigation.tabs
     - navigation.top
     - navigation.footer
+    - navigation.sections
     - navigation.indexes
     - toc.follow
     - search.suggest
@@ -58,7 +58,6 @@ theme:
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
-    - content.action.edit
 
 plugins:
   - search
