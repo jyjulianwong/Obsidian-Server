@@ -272,6 +272,14 @@ body::before {
   background: var(--md-accent-fg-color--transparent) !important;
 }
 
+/* Material also masks the sticky section header with an opaque blurred
+   div (.md-nav__container) sized to the page background, which shows up
+   as a solid black glow on our translucent glass sidebar */
+.md-sidebar .md-nav__container {
+  box-shadow: none !important;
+  background: none !important;
+}
+
 .md-sidebar .md-nav__title,
 .md-sidebar .md-nav__title[for],
 .md-sidebar .md-nav--secondary .md-nav__title,
@@ -559,7 +567,6 @@ body::before {
   box-shadow: 0 1px 0 var(--glass-highlight) inset, 0 12px 40px rgba(124, 58, 237, 0.22);
 }
 
-.obsidian-card .twemoji,
 .obsidian-card__icon {
   display: inline-flex;
   align-items: center;
@@ -574,7 +581,12 @@ body::before {
   border: 1px solid var(--obsidian-border);
 }
 
-.obsidian-card .twemoji svg,
+.obsidian-card__icon .twemoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .obsidian-card__icon svg {
   width: 1.4rem;
   height: 1.4rem;
