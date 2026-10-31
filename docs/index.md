@@ -22,7 +22,7 @@ without ever calling Obsidian back.
 
 </div>
 
-<div class="obsidian-grid" markdown>
+<div class="obsidian-grid obsidian-grid--bento" markdown>
 
 <div class="obsidian-card" markdown>
 <span class="obsidian-card__icon">:material-key-variant:</span>
