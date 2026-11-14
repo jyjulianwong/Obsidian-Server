@@ -146,7 +146,7 @@ terraform apply \
   -var="aws_account_id=$ACCOUNT_ID" \
   -var="domain_name=auth.jyjwong.com" \
   -var="jwks_domain_name=jwks.jyjwong.com" \
-  -var="allowed_origins=https://app.jyjwong.com,http://localhost:3000"
+  -var="allowed_origins=http://localhost:3000"
 ```
 
 This creates the truststore bucket, the JWT signing key (in SSM), the devices table, the Lambda function (placeholder code — see step 8), the mTLS-enabled API Gateway custom domain, and the separate public (no-mTLS) API Gateway domain that serves just the JWKS route.
@@ -252,7 +252,7 @@ In your GitHub repository → **Settings → Secrets and variables → Actions**
 | `AWS_SECRET_ACCESS_KEY` | `terraform output -raw github_actions_secret_access_key` |
 | `OBSIDIAN_DOMAIN_NAME` | e.g. `auth.jyjwong.com` |
 | `OBSIDIAN_JWKS_DOMAIN_NAME` | e.g. `jwks.jyjwong.com` |
-| `OBSIDIAN_ALLOWED_ORIGINS` | e.g. `https://app.jyjwong.com,http://localhost:3000` |
+| `OBSIDIAN_ALLOWED_ORIGINS` | Extra origins beyond the auto-allowed `*.jyjwong.com`, e.g. `http://localhost:3000` |
 
 From here on, every push to `main` touching `server/`, `terraform/`, or `ca/ca.crt` runs `terraform apply` and redeploys the Lambda automatically.
 

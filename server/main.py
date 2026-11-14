@@ -16,9 +16,20 @@ _allowed_origins = [
     if origin.strip()
 ]
 
+# Every *.jyjwong.com subdomain (and the apex) is a jyjulianwong-owned site
+# by convention (Infrastructure-GitHub's terraform/pages_domains.tf is the
+# source of truth for which ones exist) and is allowed automatically, so
+# onboarding a new GitHub Pages site never requires touching this service's
+# config. OBSIDIAN_ALLOWED_ORIGINS stays for anything outside that pattern,
+# e.g. http://localhost:3000 for local dev. allow_origins and
+# allow_origin_regex are both checked by CORSMiddleware; an origin matching
+# either is allowed.
+_JYJWONG_ORIGIN_REGEX = r"https://([a-z0-9-]+\.)?jyjwong\.com"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
+    allow_origin_regex=_JYJWONG_ORIGIN_REGEX,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )

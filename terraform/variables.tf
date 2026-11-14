@@ -22,7 +22,7 @@ variable "domain_name" {
 }
 
 variable "allowed_origins" {
-  description = "Comma-separated origins allowed to call the auth service via CORS (your other projects' UIs), e.g. https://app.jyjwong.com,http://localhost:3000"
+  description = "Comma-separated extra origins allowed to call the auth service via CORS. Every https://<subdomain>.jyjwong.com origin (and the apex) is already allowed unconditionally by server/main.py's allow_origin_regex, so this is only for origins outside that pattern, e.g. http://localhost:3000 for local dev."
   type        = string
   default     = ""
 }
