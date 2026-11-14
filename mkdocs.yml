@@ -1,6 +1,6 @@
 site_name: Obsidian
 site_description: A personal, central auth service that silently authenticates your own devices via mTLS and issues short-lived JWTs your other projects can trust.
-site_url: https://jyjulianwong.github.io/Obsidian-Server/
+site_url: https://obsidian-server.jyjwong.com/
 repo_name: jyjulianwong/Obsidian-Server
 repo_url: https://github.com/jyjulianwong/Obsidian-Server
 
