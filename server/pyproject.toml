@@ -1,6 +1,6 @@
 [project]
 name = "obsidian-server"
-version = "2026.11.14.63"
+version = "2026.11.14.64"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115,<0.116",
