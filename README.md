@@ -51,7 +51,7 @@ Your other projects verify the JWT locally via Obsidian's JWKS endpoint,
 .
 ├── server/              # FastAPI + Mangum auth service (deployed to Lambda)
 ├── terraform/
-│   ├── bootstrap/       # One-time state infrastructure (run manually once)
+│   ├── bootstrap/       # State bucket, lock table and CI OIDC role (scripts/bootstrap.sh)
 │   └── *.tf             # Main infrastructure (deployed via CI/CD after first apply)
 ├── scripts/
 │   ├── generate_ca.sh          # One-time: create the device CA
@@ -71,7 +71,8 @@ Your other projects verify the JWT locally via Obsidian's JWKS endpoint,
 
 ## Prerequisites
 
-- **AWS CLI**, configured (`aws configure`) with credentials for the account you're deploying into.
+- **AWS CLI**, signed in to the account you're deploying into (e.g. `aws sso login`).
+- **GitHub CLI** (`gh`), authenticated — `scripts/bootstrap.sh` sets the repo's Actions secrets with it.
 - **Terraform** ≥ 1.6.
 - **OpenSSL** (for the CA and device certs).
 - **uv** (Python package manager — `pip install uv`).
@@ -83,82 +84,52 @@ Your other projects verify the JWT locally via Obsidian's JWKS endpoint,
 
 Everything below is a **one-time** setup. After it's done, pushes to `main` redeploy automatically via GitHub Actions.
 
-### 1. Find your AWS account ID
-
-```bash
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-echo $ACCOUNT_ID
-```
-
-### 2. Bootstrap Terraform state infrastructure
-
-```bash
-cd terraform/bootstrap
-terraform init
-terraform apply -var="aws_account_id=$ACCOUNT_ID"
-# Creates: ${ACCOUNT_ID}-jyjulianwong-obsidian-terraform-state (S3)
-#          jyjulianwong-obsidian-terraform-lock (DynamoDB)
-cd ../..
-```
-
-### 3. Generate the device CA (on local machine only)
+### 1. Generate the device CA (on local machine only, first install only)
 
 ```bash
 ./scripts/generate_ca.sh
 ```
 
-This creates `ca/ca.key` (sensitive — never commit it, back it up offline) and `ca/ca.crt` (public — this one **is** committed, Terraform uploads it as the mTLS truststore).
+This creates `ca/ca.key` (sensitive — never commit it, back it up offline) and `ca/ca.crt` (public — this one **is** committed, Terraform uploads it as the mTLS truststore). Skip this when redeploying into another account: keep the existing CA, and every device certificate it issued stays valid.
 
-### 4. Terraform: Phase 1 — create the ACM certificates only
+### 2. Bootstrap the account
 
-Both custom domains need a validated ACM certificate before they can exist, and DNS validation for a Cloudflare-hosted domain can't be automated by Terraform (Cloudflare isn't the AWS-integrated DNS provider). So this is done in two phases.
-
-```bash
-cd terraform
-terraform init \
-  -backend-config="bucket=${ACCOUNT_ID}-jyjulianwong-obsidian-terraform-state" \
-  -backend-config="dynamodb_table=jyjulianwong-obsidian-terraform-lock"
-
-terraform apply \
-  -target=aws_acm_certificate.auth_domain \
-  -target=aws_acm_certificate.jwks_domain \
-  -var="aws_account_id=$ACCOUNT_ID" \
-  -var="domain_name=auth.jyjwong.com" \
-  -var="jwks_domain_name=jwks.jyjwong.com"
-
-terraform output acm_certificate_validation_records
-```
-
-### 5. Add the ACM validation records to Cloudflare
-
-In the Cloudflare dashboard for your domain → **DNS**, add both CNAME records printed above (one per domain):
-
-| Type | Name | Content | Proxy status |
-|---|---|---|---|
-| CNAME | (from `resource_record_name`) | (from `resource_record_value`) | **DNS only** (grey cloud) |
-
-Wait a few minutes for DNS propagation and ACM validation (usually well under 10 minutes).
-
-### 6. Terraform: Phase 2 — apply the entire plan
+Requires `jyjulianwong/Infrastructure-GitHub`'s bootstrap to have run in the same account first — it owns the account-wide GitHub Actions OIDC provider. Then, with admin credentials for the target account and an authenticated `gh` CLI:
 
 ```bash
-terraform apply \
-  -var="aws_account_id=$ACCOUNT_ID" \
-  -var="domain_name=auth.jyjwong.com" \
-  -var="jwks_domain_name=jwks.jyjwong.com" \
-  -var="allowed_origins=http://localhost:3000"
+scripts/bootstrap.sh
 ```
 
-This creates the truststore bucket, the JWT signing key (in SSM), the devices table, the Lambda function (placeholder code — see step 8), the mTLS-enabled API Gateway custom domain, and the separate public (no-mTLS) API Gateway domain that serves just the JWKS route.
+It shows each plan and asks before applying anything, and is safe to re-run. It:
+
+1. applies `terraform/bootstrap` — the Terraform state bucket (`<ACCOUNT_ID>-jyjulianwong-obsidian-terraform-state`), lock table (`jyjulianwong-obsidian-terraform-lock`), and the IAM role CI assumes through GitHub's OIDC provider (trusted for this repo's `main` branch and pull requests only — there are no static AWS keys);
+2. moves the bootstrap's own state into the state bucket, so later runs work from any clean clone;
+3. sets the `AWS_ACCOUNT_ID` and `AWS_ROLE_ARN` Actions secrets, prompts for `OBSIDIAN_DOMAIN_NAME` (e.g. `auth.jyjwong.com`), `OBSIDIAN_JWKS_DOMAIN_NAME` (e.g. `jwks.jyjwong.com`) and `GH_ADMIN_TOKEN` if the repo doesn't have them yet, and deletes any leftover `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. `OBSIDIAN_ALLOWED_ORIGINS` (extra origins beyond the auto-allowed `*.jyjwong.com`, e.g. `http://localhost:3000`) is optional — set it yourself if you need it;
+4. creates the two custom domains' ACM certificates (a targeted apply of the main stack), prints their DNS validation records, and waits while you add them in Cloudflare:
+
+   | Type | Name | Content | Proxy status |
+   |---|---|---|---|
+   | CNAME | (printed `name`) | (printed `value`) | **DNS only** (grey cloud) |
+
+   Both custom domains need a validated certificate before they can exist, and DNS validation for a Cloudflare-hosted domain can't be automated by Terraform (Cloudflare isn't the AWS-integrated DNS provider) — so this happens here, before CI's first apply, instead of blocking it. Set `OBSIDIAN_DOMAIN_NAME` / `OBSIDIAN_JWKS_DOMAIN_NAME` in your environment if you use domains other than the defaults.
+
+The CI role's permissions live in `terraform/bootstrap`, not the main stack, so CI can never widen its own access — change them by re-running the script.
+
+### 3. Deploy
+
+Push a commit to `main` that touches `server/`, `terraform/`, `.github/` or `ca/ca.crt` — or any commit whose message contains `[force-deploy]`. CI applies the whole main stack (the truststore bucket, the JWT signing key in SSM, the devices table, the Lambda, the mTLS-enabled API Gateway custom domain, and the separate public no-mTLS domain that serves just the JWKS route), then builds and deploys the real Lambda package.
+
+The JWT signing key is generated per account, so after moving accounts every previously issued token stops verifying once DNS points at the new account — devices simply fetch a new one. The devices table starts empty: copy its items over from the old account, or re-run step 5 for each device.
+
+### 4. Point Cloudflare at API Gateway — human action
+
+Once the first deploy has finished, in Cloudflare **DNS** add (or, when moving accounts, update) two records — one per custom domain:
 
 ```bash
-terraform output apigatewayv2_domain_target
-terraform output apigatewayv2_jwks_domain_target
+terraform -chdir=terraform output -raw apigatewayv2_domain_target
+terraform -chdir=terraform output -raw apigatewayv2_jwks_domain_target
 ```
 
-### 7. Point Cloudflare at API Gateway — human action
-
-In Cloudflare **DNS**, add two more records — one per custom domain:
 
 | Type | Name | Content | Proxy status |
 |---|---|---|---|
@@ -167,19 +138,7 @@ In Cloudflare **DNS**, add two more records — one per custom domain:
 
 **Important:** both must stay grey-cloud (DNS only). A proxied (orange-cloud) record terminates TLS at Cloudflare's edge — for `auth.jyjwong.com` that breaks client-certificate verification (the client cert would never reach API Gateway); for `jwks.jyjwong.com` it's not strictly required for security, but keep it consistent so ACM's TLS cert on the origin stays the one actually presented.
 
-### 8. Deploy the real Lambda code (manually for the first time only)
-
-Terraform's own zip has no dependencies bundled (just enough to create the function). Build and push the real one once, before CI/CD exists to do it for you:
-
-```bash
-cd ..   # repo root
-./scripts/package_lambda.sh
-aws lambda update-function-code \
-  --function-name "$(terraform -chdir=terraform output -raw lambda_function_name)" \
-  --zip-file fileb://server/build/lambda.zip
-```
-
-### 9. Provision your first device
+### 5. Provision your first device
 
 ```bash
 DEVICE_ID="obsidian-my-laptop"
@@ -230,7 +189,7 @@ No output is success. A "Mac verify error" here means the two prompts in step 1 
 
 Optional, for a fully silent flow on a device you manage: some browsers support pre-selecting the client certificate for a given origin via enterprise policy (e.g. Chrome's `AutoSelectCertificateForUrls`), so the OS-level cert picker never appears. The exact mechanism is OS/browser-version specific — search for that policy name plus your OS if you want it; it's a convenience, not a requirement (a picker you dismiss once per browser profile is otherwise the norm).
 
-### 10. Test it
+### 6. Test it
 
 ```bash
 DEVICE_ID="obsidian-my-laptop"
@@ -240,19 +199,6 @@ curl --cert devices/$DEVICE_ID/$DEVICE_ID.crt \
 ```
 
 You should get back `{"access_token": "...", "token_type": "bearer", "expires_in": 3600}`.
-
-### 11. Add GitHub Actions secrets
-
-In your GitHub repository → **Settings → Secrets and variables → Actions**, add:
-
-| Secret name | Value |
-|---|---|
-| `AWS_ACCOUNT_ID` | Your 12-digit AWS account ID |
-| `AWS_ACCESS_KEY_ID` | `terraform output github_actions_access_key_id` |
-| `AWS_SECRET_ACCESS_KEY` | `terraform output -raw github_actions_secret_access_key` |
-| `OBSIDIAN_DOMAIN_NAME` | e.g. `auth.jyjwong.com` |
-| `OBSIDIAN_JWKS_DOMAIN_NAME` | e.g. `jwks.jyjwong.com` |
-| `OBSIDIAN_ALLOWED_ORIGINS` | Extra origins beyond the auto-allowed `*.jyjwong.com`, e.g. `http://localhost:3000` |
 
 From here on, every push to `main` touching `server/`, `terraform/`, or `ca/ca.crt` runs `terraform apply` and redeploys the Lambda automatically.
 
@@ -336,6 +282,8 @@ Then open <http://127.0.0.1:8000>. Pages live under `docs/`; the Python and Java
 `.github/workflows/deploy-terraform.yml`:
 - **On PR** (touching `terraform/`, `server/`, or `ca/ca.crt`): runs `terraform plan` and posts the output as a PR comment.
 - **On merge to `main`**: bumps a calendar version and tags it (`version_bump`), then — checked out at that tag — runs `terraform apply` and builds + deploys the real Lambda package (`deploy`).
+
+Both jobs authenticate to AWS by assuming `AWS_ROLE_ARN` through GitHub's OIDC provider (`id-token: write`) — no AWS access keys are stored anywhere.
 
 `.github/workflows/deploy-docs.yml`:
 - **On PR** (touching `docs/`, `examples/`, `mkdocs.yml`, or `README.md`): builds the [docs site](https://obsidian-server.jyjwong.com/) with `mkdocs build --strict` to catch broken links/snippets before merge.
