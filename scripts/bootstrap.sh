@@ -26,8 +26,9 @@ OWNS_OIDC_PROVIDER=false
 EXTRA_SECRETS=(OBSIDIAN_DOMAIN_NAME OBSIDIAN_JWKS_DOMAIN_NAME GH_ADMIN_TOKEN)
 # (OBSIDIAN_ALLOWED_ORIGINS is optional — set it yourself if you need extra CORS origins.)
 NEXT_STEPS="Next: trigger your GitHub Actions CI/CD workflow to deploy the rest of the
-infrastructure (the main stack and the real Lambda code). Then, in Cloudflare,
-point both custom domains' CNAMEs (DNS only, grey cloud) at the API Gateway domains:
+infrastructure (the main stack and the real Lambda code). Once that run has
+finished, in Cloudflare, point both custom domains' CNAMEs (DNS only, grey cloud)
+at the API Gateway domains (after the init above):
   terraform -chdir=terraform output -raw apigatewayv2_domain_target       # ${OBSIDIAN_DOMAIN_NAME:-auth.jyjwong.com}
   terraform -chdir=terraform output -raw apigatewayv2_jwks_domain_target  # ${OBSIDIAN_JWKS_DOMAIN_NAME:-jwks.jyjwong.com}"
 
@@ -270,6 +271,14 @@ step "Bootstrapped $GITHUB_REPOSITORY into AWS account $ACCOUNT_ID"
 echo "  State bucket: s3://$STATE_BUCKET"
 echo "  Lock table:   $LOCK_TABLE"
 echo "  CI role:      $ROLE_ARN"
+echo
+# terraform/ (the main stack) keeps its own backend settings in .terraform/;
+# a checkout that last ran against another account still points there.
+echo "To use terraform/ (the main stack) from this checkout, e.g. for terraform output,"
+echo "point it at this account's state first:"
+echo "  terraform -chdir=terraform init -reconfigure \\"
+echo "    -backend-config=\"bucket=$STATE_BUCKET\" \\"
+echo "    -backend-config=\"dynamodb_table=$LOCK_TABLE\""
 if [[ -n ${NEXT_STEPS:-} ]]; then
   echo
   echo "$NEXT_STEPS"
