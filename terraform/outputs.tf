@@ -57,14 +57,3 @@ output "openid_configuration_url" {
   description = "OAuth/OIDC discovery document — lives under issuer_url like /auth/token, so fetching it requires a device client certificate. jwks_uri inside it points at jwks_url, not a path under the issuer."
   value       = "${local.issuer}/.well-known/openid-configuration"
 }
-
-output "github_actions_access_key_id" {
-  description = "AWS access key ID for GitHub Actions — store as GitHub secret AWS_ACCESS_KEY_ID"
-  value       = aws_iam_access_key.github_actions.id
-}
-
-output "github_actions_secret_access_key" {
-  description = "AWS secret access key for GitHub Actions — store as GitHub secret AWS_SECRET_ACCESS_KEY"
-  value       = aws_iam_access_key.github_actions.secret
-  sensitive   = true
-}
