@@ -23,8 +23,8 @@ permissions:
   contents: read
 
 jobs:
-  scan-vulnerabilities:
-    name: Scan Vulnerabilities
+  security-scan:
+    name: Security scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,8 +36,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
-    name: Build Site
-    needs: scan-vulnerabilities
+    name: Build site
+    needs: security-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
